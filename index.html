@@ -1,0 +1,907 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>FFXIV Weekly Lockout Tracker</title>
+<style>
+  :root {
+    --bg: #14161c;
+    --panel: #1d2029;
+    --panel-2: #232633;
+    --border: #313545;
+    --text: #e8eaf2;
+    --muted: #9aa0b5;
+    --accent: #7aa2f7;
+    --accent-2: #9ece6a;
+    --danger: #f7768e;
+    --radius: 10px;
+  }
+  * { box-sizing: border-box; }
+  html, body { margin: 0; padding: 0; }
+  body {
+    background: var(--bg);
+    color: var(--text);
+    font-family: "Segoe UI", system-ui, -apple-system, sans-serif;
+    font-size: 15px;
+    line-height: 1.5;
+    min-height: 100vh;
+  }
+  header.app-header {
+    padding: 18px 24px 14px;
+    border-bottom: 1px solid var(--border);
+    background: var(--panel);
+  }
+  header.app-header h1 {
+    margin: 0;
+    font-size: 20px;
+    letter-spacing: 0.3px;
+  }
+  header.app-header .subtitle {
+    color: var(--muted);
+    font-size: 13px;
+    margin-top: 2px;
+  }
+  .reset-bar {
+    margin-top: 12px;
+    display: flex;
+    flex-wrap: wrap;
+    gap: 10px;
+    align-items: center;
+  }
+  .chip {
+    background: var(--panel-2);
+    border: 1px solid var(--border);
+    border-radius: 999px;
+    padding: 6px 14px;
+    font-size: 13px;
+    white-space: nowrap;
+  }
+  .chip strong { color: var(--accent); }
+  .chip.done strong { color: var(--accent-2); }
+  button {
+    font: inherit;
+    color: var(--text);
+    background: var(--panel-2);
+    border: 1px solid var(--border);
+    border-radius: 6px;
+    padding: 5px 12px;
+    cursor: pointer;
+  }
+  button:hover { border-color: var(--accent); }
+  button.icon-btn {
+    padding: 2px 8px;
+    color: var(--muted);
+    border: none;
+    background: transparent;
+    font-size: 14px;
+  }
+  button.icon-btn:hover { color: var(--danger); }
+  button.primary {
+    background: var(--accent);
+    color: #10131a;
+    border-color: var(--accent);
+    font-weight: 600;
+  }
+  button.primary:hover { filter: brightness(1.1); }
+  button:disabled { opacity: 0.4; cursor: default; }
+  input, select {
+    font: inherit;
+    background: var(--panel-2);
+    color: var(--text);
+    border: 1px solid var(--border);
+    border-radius: 6px;
+    padding: 6px 10px;
+  }
+  input:focus, select:focus { outline: 1px solid var(--accent); }
+  .layout {
+    display: grid;
+    grid-template-columns: 280px 1fr;
+    gap: 0;
+    align-items: start;
+    min-height: calc(100vh - 120px);
+  }
+  .sidebar {
+    border-right: 1px solid var(--border);
+    background: var(--panel);
+    padding: 16px;
+    min-height: 100%;
+  }
+  .sidebar h2 {
+    margin: 0 0 8px;
+    font-size: 13px;
+    text-transform: uppercase;
+    letter-spacing: 1px;
+    color: var(--muted);
+  }
+  .dc-group { margin-bottom: 14px; }
+  .dc-name {
+    font-size: 12px;
+    color: var(--accent);
+    letter-spacing: 0.5px;
+    margin-bottom: 4px;
+  }
+  .char-item {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    padding: 6px 8px;
+    border-radius: 6px;
+    width: 100%;
+    background: transparent;
+    border: 1px solid transparent;
+    text-align: left;
+  }
+  .char-item:hover { background: var(--panel-2); }
+  .char-item.active {
+    background: var(--panel-2);
+    border-color: var(--accent);
+  }
+  .char-item .name { flex: 1; overflow: hidden; text-overflow: ellipsis; }
+  .char-item .pct {
+    font-size: 12px;
+    color: var(--muted);
+    font-variant-numeric: tabular-nums;
+  }
+  .char-item .pct.all { color: var(--accent-2); }
+  .add-char { display: flex; flex-direction: column; gap: 8px; margin-top: 10px; }
+  .add-char select, .add-char input { width: 100%; }
+  .main {
+    padding: 20px 24px 40px;
+    max-width: 900px;
+  }
+  .char-header {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: baseline;
+    gap: 10px;
+    margin-bottom: 6px;
+  }
+  .char-header h2 { margin: 0; font-size: 22px; }
+  .char-header .meta { color: var(--muted); font-size: 13px; }
+  .progress-track {
+    height: 8px;
+    background: var(--panel-2);
+    border-radius: 999px;
+    overflow: hidden;
+    margin: 10px 0 4px;
+    border: 1px solid var(--border);
+  }
+  .progress-fill {
+    height: 100%;
+    background: var(--accent);
+    transition: width 0.2s ease;
+  }
+  .progress-fill.full { background: var(--accent-2); }
+  .progress-label { font-size: 13px; color: var(--muted); }
+  .progress-label.done { color: var(--accent-2); }
+  .task-group { margin-top: 22px; }
+  .task-group h3 {
+    margin: 0 0 6px;
+    font-size: 13px;
+    text-transform: uppercase;
+    letter-spacing: 1px;
+    color: var(--muted);
+    border-bottom: 1px solid var(--border);
+    padding-bottom: 4px;
+  }
+  .task-row {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    padding: 8px 10px;
+    border-radius: 6px;
+  }
+  .task-row:hover { background: var(--panel-2); }
+  .task-row input[type="checkbox"] {
+    width: 18px;
+    height: 18px;
+    accent-color: var(--accent);
+    cursor: pointer;
+    flex-shrink: 0;
+  }
+  .task-row .task-label { flex: 1; cursor: pointer; }
+  .task-row.completed .task-label { color: var(--muted); text-decoration: line-through; }
+  .empty-state {
+    background: var(--panel);
+    border: 1px dashed var(--border);
+    border-radius: var(--radius);
+    padding: 32px;
+    color: var(--muted);
+    text-align: center;
+    margin-top: 24px;
+  }
+  .empty-state h3 { color: var(--text); margin: 0 0 6px; }
+  details.manage {
+    margin-top: 28px;
+    background: var(--panel);
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    padding: 12px 16px;
+  }
+  details.manage summary {
+    cursor: pointer;
+    color: var(--muted);
+    font-size: 14px;
+    user-select: none;
+  }
+  details.manage summary:hover { color: var(--text); }
+  .add-task-row {
+    display: flex;
+    gap: 8px;
+    margin: 12px 0;
+    flex-wrap: wrap;
+  }
+  .add-task-row input[type="text"] { flex: 1; min-width: 200px; }
+  .manage-list .task-row { padding: 6px 4px; }
+  footer.app-footer {
+    border-top: 1px solid var(--border);
+    padding: 14px 24px;
+    font-size: 12px;
+    color: var(--muted);
+    display: flex;
+    flex-wrap: wrap;
+    gap: 12px;
+    align-items: center;
+    justify-content: space-between;
+    background: var(--panel);
+  }
+  footer.app-footer .links { display: flex; gap: 8px; align-items: center; flex-wrap: wrap; }
+  .toast {
+    position: fixed;
+    bottom: 20px;
+    left: 50%;
+    transform: translateX(-50%);
+    background: var(--panel-2);
+    border: 1px solid var(--accent);
+    border-radius: var(--radius);
+    padding: 10px 18px;
+    font-size: 14px;
+    opacity: 0;
+    pointer-events: none;
+    transition: opacity 0.3s ease;
+    z-index: 10;
+  }
+  .toast.show { opacity: 1; }
+  @media (max-width: 720px) {
+    .layout { grid-template-columns: 1fr; }
+    .sidebar { border-right: none; border-bottom: 1px solid var(--border); }
+    .main { padding: 16px; }
+  }
+  .sr-only {
+    position: absolute;
+    width: 1px; height: 1px;
+    padding: 0; margin: -1px;
+    overflow: hidden;
+    clip: rect(0 0 0 0);
+    white-space: nowrap;
+    border: 0;
+  }
+</style>
+</head>
+<body>
+<header class="app-header">
+  <h1>FFXIV Weekly Lockout Tracker</h1>
+  <div class="subtitle">Check off raids, trials, and turn-ins for your whole roster &mdash; everything stays in your browser's localStorage. No accounts, no servers.</div>
+  <div class="reset-bar">
+    <span class="chip" id="countdown-chip">Next reset: <strong>loading&hellip;</strong></span>
+    <span class="chip" id="week-chip">Week: <strong>loading&hellip;</strong></span>
+    <button type="button" id="prev-week">&#8592; Previous</button>
+    <button type="button" id="next-week">Next &#8594;</button>
+    <button type="button" id="this-week">This week</button>
+  </div>
+</header>
+
+<div class="layout">
+  <aside class="sidebar" aria-label="Characters">
+    <h2>Characters</h2>
+    <div id="char-list"></div>
+    <form class="add-char" id="add-char-form">
+      <label class="sr-only" for="char-name">Character name</label>
+      <input type="text" id="char-name" placeholder="Character name" maxlength="30" required>
+      <label class="sr-only" for="char-dc">Data center</label>
+      <select id="char-dc" required></select>
+      <button type="submit" class="primary">Add character</button>
+    </form>
+  </aside>
+
+  <main class="main" id="main">
+    <div id="checklist-root"></div>
+
+    <details class="manage" id="manage-section">
+      <summary>Manage weekly tasks (applies to every character)</summary>
+      <form class="add-task-row" id="add-task-form">
+        <label class="sr-only" for="new-task-name">New task name</label>
+        <input type="text" id="new-task-name" placeholder="e.g. M8S weekly clear" maxlength="80" required>
+        <label class="sr-only" for="new-task-group">Group</label>
+        <select id="new-task-group">
+          <option value="Raids">Raids</option>
+          <option value="Trials">Trials</option>
+          <option value="Turn-ins">Turn-ins</option>
+          <option value="Other">Other</option>
+        </select>
+        <button type="submit" class="primary">Add task</button>
+      </form>
+      <div class="manage-list" id="task-manage-list"></div>
+    </details>
+
+    <details class="manage">
+      <summary>Backup &amp; restore</summary>
+      <p style="color: var(--muted); font-size: 13px;">
+        Your data lives only in this browser. Export a copy before clearing browser data, then import it here later.
+      </p>
+      <div style="display:flex; gap:8px; flex-wrap:wrap;">
+        <button type="button" id="export-btn">Export data (JSON)</button>
+        <button type="button" id="import-btn">Import data</button>
+        <input type="file" id="import-file" accept="application/json" class="sr-only">
+      </div>
+    </details>
+  </main>
+</div>
+
+<footer class="app-footer">
+  <span>Weekly reset: Tuesday 8:00 AM UTC. Data center is just how you organize your roster &mdash; completion is tracked per character per week.</span>
+  <span class="links">
+    <span>&copy; 2026 Asdale Dynamics, LLC &middot; MIT License</span>
+  </span>
+</footer>
+
+<div class="toast" id="toast" role="status"></div>
+
+<script>
+// BEGIN-TIME-LOGIC
+"use strict";
+const RESET_LOGIC = (function () {
+  const RESET_HOUR_UTC = 8;
+  const RESET_DAY_UTC = 2; // Tuesday
+  const MS_PER_DAY = 24 * 60 * 60 * 1000;
+  const MS_PER_WEEK = 7 * MS_PER_DAY;
+
+  function pad2(n) {
+    return String(n).padStart(2, "0");
+  }
+
+  function startOfUtcDate(d) {
+    return Date.UTC(d.getUTCFullYear(), d.getUTCMonth(), d.getUTCDate(), 0, 0, 0, 0);
+  }
+
+  function weekIdFor(startMs) {
+    const d = new Date(startMs);
+    const y = d.getUTCFullYear();
+    const m = pad2(d.getUTCMonth() + 1);
+    const day = pad2(d.getUTCDate());
+    return y + "-" + m + "-" + day;
+  }
+
+  function currentWeek(nowMs) {
+    const now = nowMs instanceof Date ? nowMs.getTime() : nowMs;
+    const d = new Date(now);
+    const midnight = startOfUtcDate(d);
+    const dow = d.getUTCDay(); // 0 = Sunday
+    // Monday 00:00 UTC of the week containing "now"
+    const mondayOffsetDays = dow === 0 ? 6 : dow - 1;
+    const monday = midnight - mondayOffsetDays * MS_PER_DAY;
+    // Tuesday 08:00 UTC of that same week
+    let candidate = monday + (RESET_DAY_UTC - 1) * MS_PER_DAY + RESET_HOUR_UTC * 60 * 60 * 1000;
+    if (candidate > now) {
+      candidate -= MS_PER_WEEK;
+    }
+    return {
+      start: candidate,
+      end: candidate + MS_PER_WEEK,
+      id: weekIdFor(candidate),
+    };
+  }
+
+  function nextReset(nowMs) {
+    return currentWeek(nowMs).end;
+  }
+
+  function countdownParts(nowMs, targetMs) {
+    let diff = Math.max(0, Math.floor((targetMs - nowMs) / 1000));
+    const days = Math.floor(diff / 86400);
+    diff -= days * 86400;
+    const hours = Math.floor(diff / 3600);
+    diff -= hours * 3600;
+    const minutes = Math.floor(diff / 60);
+    const seconds = diff - minutes * 60;
+    return { days, hours, minutes, seconds };
+  }
+
+  function formatCountdown(nowMs, targetMs) {
+    const p = countdownParts(nowMs, targetMs);
+    return p.days + "d " + pad2(p.hours) + "h " + pad2(p.minutes) + "m";
+  }
+
+  function formatResetMoment(ms) {
+    const d = new Date(ms);
+    const days = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];
+    return (
+      days[d.getUTCDay()] + " " +
+      weekIdFor(ms) + " " +
+      pad2(d.getUTCHours()) + ":00 UTC"
+    );
+  }
+
+  function weekStartsWithOffset(nowMs, offsetWeeks) {
+    const w = currentWeek(nowMs);
+    return w.start + offsetWeeks * MS_PER_WEEK;
+  }
+
+  return {
+    RESET_HOUR_UTC,
+    RESET_DAY_UTC,
+    MS_PER_WEEK,
+    currentWeek,
+    nextReset,
+    countdownParts,
+    formatCountdown,
+    formatResetMoment,
+    weekIdFor,
+    weekStartsWithOffset,
+  };
+})();
+globalThis.RESET_LOGIC = RESET_LOGIC;
+// END-TIME-LOGIC
+
+const reset = RESET_LOGIC;
+
+const DC_LIST = [
+  "Aether", "Crystal", "Dynamis", "Primal",
+  "Chaos", "Light", "Shadow",
+  "Elemental", "Gaia", "Mana", "Meteor",
+  "Materia",
+];
+
+const GROUP_ORDER = ["Raids", "Trials", "Turn-ins", "Other"];
+
+const DEFAULT_TASKS = [
+  { id: "t-raids-savage", group: "Raids", name: "Current Savage tier weekly clear" },
+  { id: "t-raids-extreme", group: "Raids", name: "Weekly raids on all jobs needing loot" },
+  { id: "t-trials-trial", group: "Trials", name: "Weekly trial quest / Ex trial clear" },
+  { id: "t-trials-custom", group: "Trials", name: "Custom deliveries (12 turn-ins)" },
+  { id: "t-turnins-wondrous", group: "Turn-ins", name: "Wondrous Tails (9 stickers)" },
+  { id: "t-turnins-alliance", group: "Turn-ins", name: "Weekly alliance raid / leveling quest" },
+  { id: "t-other-tomes", group: "Other", name: "Cap weekly tomestones (450)" },
+  { id: "t-other-frontline", group: "Other", name: "Frontline PvP (3 matches)" },
+];
+
+const STORAGE_KEY = "ffxiv-weekly-lockout-tracker-v1";
+
+let state = loadState();
+let selectedCharId = state.characters.length ? state.characters[0].id : null;
+let viewWeekStart = reset.currentWeek(Date.now()).start;
+let editingTaskId = null;
+
+function uid(prefix) {
+  return prefix + "-" + Date.now().toString(36) + "-" + Math.random().toString(36).slice(2, 8);
+}
+
+function loadState() {
+  try {
+    const raw = localStorage.getItem(STORAGE_KEY);
+    if (raw) {
+      const parsed = JSON.parse(raw);
+      if (parsed && typeof parsed === "object" && Array.isArray(parsed.characters) && parsed.characters.every((c) => c && typeof c === "object")) {
+        if (!Array.isArray(parsed.tasks)) parsed.tasks = defaultTasks();
+        if (!parsed.progress || typeof parsed.progress !== "object") parsed.progress = {};
+        return parsed;
+      }
+    }
+  } catch (err) {
+    // corrupted or blocked storage: fall through to a fresh state
+  }
+  return {
+    version: 1,
+    characters: [],
+    tasks: defaultTasks(),
+    progress: {},
+  };
+}
+
+function defaultTasks() {
+  return DEFAULT_TASKS.map((t) => ({ ...t }));
+}
+
+function saveState() {
+  try {
+    localStorage.setItem(STORAGE_KEY, JSON.stringify(state));
+  } catch (err) {
+    showToast("Could not save: browser storage is unavailable.");
+  }
+}
+
+function getChar(id) {
+  return state.characters.find((c) => c.id === id) || null;
+}
+
+function isDone(weekId, charId, taskId) {
+  return !!(state.progress[weekId] && state.progress[weekId][charId] && state.progress[weekId][charId][taskId]);
+}
+
+function setDone(weekId, charId, taskId, value) {
+  if (!state.progress[weekId]) state.progress[weekId] = {};
+  if (!state.progress[weekId][charId]) state.progress[weekId][charId] = {};
+  if (value) {
+    state.progress[weekId][charId][taskId] = true;
+  } else {
+    delete state.progress[weekId][charId][taskId];
+  }
+  saveState();
+}
+
+function charProgress(charId, weekId) {
+  const tasks = state.tasks;
+  let done = 0;
+  for (const t of tasks) {
+    if (isDone(weekId, charId, t.id)) done += 1;
+  }
+  return { done, total: tasks.length };
+}
+
+function el(tag, attrs, ...children) {
+  const node = document.createElement(tag);
+  if (attrs) {
+    for (const [key, value] of Object.entries(attrs)) {
+      if (key === "class") node.className = value;
+      else if (key === "checked") node.checked = !!value;
+      else if (key === "value") node.value = value;
+      else if (key.startsWith("on") && typeof value === "function") node.addEventListener(key.slice(2), value);
+      else if (value !== null && value !== undefined) node.setAttribute(key, value);
+    }
+  }
+  for (const child of children) {
+    if (child === null || child === undefined) continue;
+    node.append(child);
+  }
+  return node;
+}
+
+function fmtDate(ms) {
+  return new Date(ms).toLocaleDateString(undefined, { weekday: "short", month: "short", day: "numeric", year: "numeric", timeZone: "UTC" });
+}
+
+function render() {
+  renderChars();
+  renderChecklist();
+  renderManageList();
+  renderWeekChips();
+}
+
+function renderWeekChips() {
+  const now = Date.now();
+  const current = reset.currentWeek(now);
+  const countdownChip = document.getElementById("countdown-chip");
+  const weekChip = document.getElementById("week-chip");
+  const isCurrentWeek = viewWeekStart === current.start;
+
+  if (isCurrentWeek) {
+    const msLeft = current.end - now;
+    const cdown = reset.formatCountdown(now, current.end);
+    countdownChip.innerHTML = "";
+    countdownChip.append("Next reset in: ");
+    const strong = document.createElement("strong");
+    strong.textContent = cdown;
+    countdownChip.append(strong);
+    countdownChip.classList.toggle("done", false);
+    countdownChip.title = "Resets " + reset.formatResetMoment(current.end);
+    if (msLeft < 60 * 60 * 1000) countdownChip.title = "Resets soon — " + reset.formatResetMoment(current.end);
+  } else {
+    const targetWeek = (viewWeekStart + reset.MS_PER_WEEK) - now;
+    countdownChip.innerHTML = "";
+    countdownChip.append("Viewing past week — next reset in: ");
+    const strong = document.createElement("strong");
+    strong.textContent = reset.formatCountdown(now, Date.now() + targetWeek);
+    countdownChip.append(strong);
+    countdownChip.title = reset.formatResetMoment(viewWeekStart + reset.MS_PER_WEEK);
+  }
+
+  weekChip.innerHTML = "";
+  weekChip.append("Week of ");
+  const wstrong = document.createElement("strong");
+  wstrong.textContent = fmtDate(viewWeekStart);
+  weekChip.append(wstrong);
+  weekChip.title = "Week runs until " + reset.formatResetMoment(viewWeekStart + reset.MS_PER_WEEK);
+}
+
+function renderChars() {
+  const container = document.getElementById("char-list");
+  container.innerHTML = "";
+  const dcSelect = document.getElementById("char-dc");
+  if (!dcSelect.options.length) {
+    for (const dc of DC_LIST) {
+      const opt = document.createElement("option");
+      opt.value = dc;
+      opt.textContent = dc;
+      dcSelect.append(opt);
+    }
+  }
+
+  const byDc = {};
+  for (const c of state.characters) {
+    (byDc[c.dc] = byDc[c.dc] || []).push(c);
+  }
+  const dcs = Object.keys(byDc).sort();
+
+  if (!state.characters.length) {
+    container.append(el("p", { style: "color: var(--muted); font-size: 13px; margin-top: 4px;" }, "No characters yet. Add your first one below."));
+  }
+
+  for (const dc of dcs) {
+    const group = el("div", { class: "dc-group" });
+    group.append(el("div", { class: "dc-name" }, dc));
+    for (const c of byDc[dc]) {
+      const prog = charProgress(c.id, reset.weekIdFor(viewWeekStart));
+      const allDone = prog.done === prog.total && prog.total > 0;
+      const item = el("div", { class: "char-item" + (c.id === selectedCharId ? " active" : "") },
+        el("button", {
+          type: "button",
+          class: "name",
+          style: "background: transparent; border: none; padding: 0; text-align: left; overflow: hidden; text-overflow: ellipsis; flex: 1;",
+          onclick: () => { selectedCharId = c.id; render(); },
+        }, c.name),
+        el("span", { class: "pct" + (allDone ? " all" : "") }, prog.done + "/" + prog.total),
+        el("button", {
+          type: "button",
+          class: "icon-btn",
+          title: "Remove " + c.name,
+          "aria-label": "Remove " + c.name,
+          onclick: (e) => { e.stopPropagation(); deleteChar(c.id); },
+        }, "\u2715")
+      );
+      group.append(item);
+    }
+    container.append(group);
+  }
+}
+
+function renderChecklist() {
+  const root = document.getElementById("checklist-root");
+  root.innerHTML = "";
+  const weekId = reset.weekIdFor(viewWeekStart);
+  const currentWeek = reset.currentWeek(Date.now());
+  const isPast = viewWeekStart < currentWeek.start;
+  const isFuture = viewWeekStart > currentWeek.start;
+
+  if (!selectedCharId || !getChar(selectedCharId)) {
+    root.append(el("div", { class: "empty-state" },
+      el("h3", null, "Welcome, adventurer"),
+      el("p", null, "Add a character from the panel on the left to start tracking your weekly lockouts."),
+      el("p", { style: "font-size: 13px;" }, "Everything is saved locally in your browser — no accounts, no logins, works offline.")
+    ));
+    return;
+  }
+
+  const char = getChar(selectedCharId);
+  const prog = charProgress(char.id, weekId);
+  const doneAll = prog.done === prog.total && prog.total > 0;
+
+  root.append(el("div", { class: "char-header" },
+    el("h2", null, char.name),
+    el("span", { class: "meta" }, char.dc),
+    isPast ? el("span", { class: "meta" }, "(past week — kept for your history)") : null,
+    isFuture ? el("span", { class: "meta" }, "(upcoming week)") : null
+  ));
+
+  const pct = prog.total ? Math.round((prog.done / prog.total) * 100) : 0;
+  root.append(el("div", { class: "progress-track", role: "progressbar", "aria-valuenow": String(pct), "aria-valuemin": "0", "aria-valuemax": "100" },
+    el("div", { class: "progress-fill" + (doneAll ? " full" : ""), style: "width: " + pct + "%" })
+  ));
+  root.append(el("div", { class: "progress-label" + (doneAll ? " done" : "") },
+    doneAll ? "Week complete — " + prog.total + "/" + prog.total + " done" : prog.done + " of " + prog.total + " tasks done (" + pct + "%)"
+  ));
+
+  for (const group of GROUP_ORDER) {
+    const tasks = state.tasks.filter((t) => t.group === group);
+    if (!tasks.length) continue;
+    const section = el("div", { class: "task-group" });
+    section.append(el("h3", null, group));
+    for (const task of tasks) {
+      const done = isDone(weekId, char.id, task.id);
+      const row = el("div", { class: "task-row" + (done ? " completed" : "") },
+        el("input", {
+          type: "checkbox",
+          id: "cb-" + task.id,
+          checked: done,
+          onchange: (e) => { setDone(weekId, char.id, task.id, e.target.checked); render(); },
+        }),
+        el("label", { class: "task-label", for: "cb-" + task.id }, task.name)
+      );
+      section.append(row);
+    }
+    root.append(section);
+  }
+}
+
+function renderManageList() {
+  const container = document.getElementById("task-manage-list");
+  container.innerHTML = "";
+  for (const task of state.tasks) {
+    const row = el("div", { class: "task-row" },
+      el("span", { class: "task-label", style: "color: var(--muted); font-size: 13px;" }, "[" + task.group + "] "),
+      el("span", { class: "task-label", id: "task-name-" + task.id }, task.name),
+      el("button", {
+        type: "button",
+        class: "icon-btn",
+        title: "Rename task",
+        "aria-label": "Rename task",
+        onclick: () => startEditTask(task.id),
+      }, "\u270E"),
+      el("button", {
+        type: "button",
+        class: "icon-btn",
+        title: "Delete task",
+        "aria-label": "Delete task",
+        onclick: () => deleteTask(task.id),
+      }, "\u2715")
+    );
+    container.append(row);
+  }
+  if (editingTaskId) {
+    const span = document.getElementById("task-name-" + editingTaskId);
+    const task = state.tasks.find((t) => t.id === editingTaskId);
+    if (span && task) {
+      const input = el("input", { type: "text", value: task.name, maxlength: "80", style: "flex: 1;" });
+      input.addEventListener("keydown", (e) => {
+        if (e.key === "Enter") { e.preventDefault(); finishEditTask(task.id, input.value); }
+        if (e.key === "Escape") { editingTaskId = null; renderManageList(); }
+      });
+      input.addEventListener("blur", () => finishEditTask(task.id, input.value));
+      span.replaceWith(input);
+      input.focus();
+      input.select();
+    }
+  }
+}
+
+function startEditTask(id) {
+  editingTaskId = id;
+  renderManageList();
+}
+
+function finishEditTask(id, name) {
+  if (editingTaskId !== id) return;
+  editingTaskId = null;
+  const trimmed = name.trim();
+  if (trimmed) {
+    const task = state.tasks.find((t) => t.id === id);
+    if (task) {
+      task.name = trimmed;
+      saveState();
+      render();
+      return;
+    }
+  }
+  renderManageList();
+}
+
+function deleteTask(id) {
+  const task = state.tasks.find((t) => t.id === id);
+  if (!task) return;
+  if (!confirm('Remove task "' + task.name + '" from the weekly checklist? Your completion history for it is also removed for every week.')) return;
+  state.tasks = state.tasks.filter((t) => t.id !== id);
+  for (const weekId of Object.keys(state.progress)) {
+    for (const charId of Object.keys(state.progress[weekId])) {
+      delete state.progress[weekId][charId][id];
+    }
+  }
+  saveState();
+  render();
+  showToast("Task removed.");
+}
+
+function deleteChar(id) {
+  const char = getChar(id);
+  if (!char) return;
+  if (!confirm('Remove "' + char.name + " (" + char.dc + ')" and their checked history?')) return;
+  state.characters = state.characters.filter((c) => c.id !== id);
+  for (const weekId of Object.keys(state.progress)) {
+    delete state.progress[weekId][id];
+  }
+  if (selectedCharId === id) {
+    selectedCharId = state.characters.length ? state.characters[0].id : null;
+  }
+  saveState();
+  render();
+  showToast("Character removed.");
+}
+
+function moveWeek(delta) {
+  viewWeekStart += delta * reset.MS_PER_WEEK;
+  render();
+}
+
+function showToast(message) {
+  const toast = document.getElementById("toast");
+  toast.textContent = message;
+  toast.classList.add("show");
+  clearTimeout(showToast._timer);
+  showToast._timer = setTimeout(() => toast.classList.remove("show"), 2600);
+}
+
+document.getElementById("add-char-form").addEventListener("submit", (e) => {
+  e.preventDefault();
+  const nameInput = document.getElementById("char-name");
+  const dcSelect = document.getElementById("char-dc");
+  const name = nameInput.value.trim();
+  if (!name) return;
+  const char = { id: uid("char"), name, dc: dcSelect.value };
+  state.characters.push(char);
+  selectedCharId = char.id;
+  nameInput.value = "";
+  saveState();
+  render();
+  document.getElementById("char-name").focus();
+});
+
+document.getElementById("add-task-form").addEventListener("submit", (e) => {
+  e.preventDefault();
+  const nameInput = document.getElementById("new-task-name");
+  const groupSelect = document.getElementById("new-task-group");
+  const name = nameInput.value.trim();
+  if (!name) return;
+  state.tasks.push({ id: uid("task"), group: groupSelect.value, name });
+  nameInput.value = "";
+  saveState();
+  render();
+  showToast("Task added to '" + groupSelect.value + "'.");
+});
+
+document.getElementById("prev-week").addEventListener("click", () => moveWeek(-1));
+document.getElementById("next-week").addEventListener("click", () => moveWeek(1));
+document.getElementById("this-week").addEventListener("click", () => {
+  viewWeekStart = reset.currentWeek(Date.now()).start;
+  render();
+});
+
+document.getElementById("export-btn").addEventListener("click", () => {
+  const blob = new Blob([JSON.stringify(state, null, 2)], { type: "application/json" });
+  const link = document.createElement("a");
+  link.href = URL.createObjectURL(blob);
+  link.download = "ffxiv-weekly-lockout-backup.json";
+  link.click();
+  URL.revokeObjectURL(link.href);
+  showToast("Backup exported.");
+});
+
+document.getElementById("import-btn").addEventListener("click", () => {
+  document.getElementById("import-file").click();
+});
+
+document.getElementById("import-file").addEventListener("change", (e) => {
+  const file = e.target.files[0];
+  if (!file) return;
+  const reader = new FileReader();
+  reader.onload = () => {
+    try {
+      const parsed = JSON.parse(reader.result);
+      if (!parsed || typeof parsed !== "object" || !Array.isArray(parsed.characters) || !Array.isArray(parsed.tasks)) {
+        throw new Error("not a valid backup file");
+      }
+      if (!parsed.progress || typeof parsed.progress !== "object") parsed.progress = {};
+      state = parsed;
+      selectedCharId = state.characters.length ? state.characters[0].id : null;
+      saveState();
+      render();
+      showToast("Backup restored.");
+    } catch (err) {
+      showToast("Import failed: " + err.message);
+    }
+  };
+  reader.readAsText(file);
+  e.target.value = "";
+});
+
+function tickCountdown() {
+  renderWeekChips();
+  if (viewWeekStart !== reset.currentWeek(Date.now()).start) {
+    viewWeekStart = reset.currentWeek(Date.now()).start;
+    render();
+  }
+}
+setInterval(tickCountdown, 30 * 1000);
+
+render();
+</script>
+</body>
+</html>
